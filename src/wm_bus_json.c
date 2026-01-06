@@ -2,14 +2,24 @@
 #include <stdio.h>
 #include <string.h>
 
-/* Helper macro to safely append to buffer */
-#define APPEND(fmt, ...)                                      \
-    do {                                                      \
-        int n = snprintf(ptr, remaining, fmt, __VA_ARGS__);  \
-        if (n < 0 || (size_t)n >= remaining)                  \
-            return WM_JSON_ERR_BUFFER_TOO_SMALL;             \
-        ptr += n;                                             \
-        remaining -= n;                                      \
+/* Append plain string */
+#define APPEND_STR(str)                                      \
+    do {                                                     \
+        int n = snprintf(ptr, remaining, "%s", str);        \
+        if (n < 0 || (size_t)n >= remaining)                \
+            return WM_JSON_ERR_BUFFER_TOO_SMALL;            \
+        ptr += n;                                            \
+        remaining -= n;                                     \
+    } while (0)
+
+/* Append formatted string */
+#define APPEND_FMT(fmt, ...)                                 \
+    do {                                                     \
+        int n = snprintf(ptr, remaining, fmt, __VA_ARGS__); \
+        if (n < 0 || (size_t)n >= remaining)                \
+            return WM_JSON_ERR_BUFFER_TOO_SMALL;            \
+        ptr += n;                                            \
+        remaining -= n;                                     \
     } while (0)
 
 wm_json_status_t wm_serialize_to_json(
@@ -25,36 +35,69 @@ wm_json_status_t wm_serialize_to_json(
     char *ptr = output;
     size_t remaining = output_size;
 
-    /* Outer array and gateway object */
-    APPEND("[{\"gatewayId\":\"%s\",\"date\":\"%s\",\"deviceType\":\"%s\",",
-           input->gateway_id,
-           input->date,
-           input->device_type);
+    /* Start JSON array and gateway object */
+    APPEND_FMT(
+        "[{\"gatewayId\":\"%s\",\"date\":\"%s\",\"deviceType\":\"%s\",",
+        input->gateway_id,
+        input->date,
+        input->device_type
+    );
 
-    APPEND("\"interval_minutes\":%u,\"total_readings\":%u,",
-           input->interval_minutes,
-           input->total_readings);
+    APPEND_FMT(
+        "\"interval_minutes\":%u,\"total_readings\":%u,",
+        input->interval_minutes,
+        input->total_readings
+    );
 
     /* Values object */
-    APPEND("\"values\":{\"device_count\":%u,\"readings\":[",
-           input->device_count);
+    APPEND_FMT(
+        "\"values\":{\"device_count\":%u,\"readings\":[",
+        input->device_count
+    );
 
-    /* Device loop */
+    /* Devices loop */
     for (uint8_t i = 0; i < input->device_count; i++) {
-        wm_device_reading_t *dev = &input->devices[i];
+        const wm_device_reading_t *dev = &input->devices[i];
 
-        APPEND("{\"media\":\"%s\",\"meter\":\"%s\",\"deviceId\":\"%s\",\"unit\":\"%s\",\"data\":[",
-               dev->media,
-               dev->meter,
-               dev->device_id,
-               dev->unit);
+        APPEND_FMT(
+            "{\"media\":\"%s\",\"meter\":\"%s\",\"deviceId\":\"%s\",\"unit\":\"%s\",\"data\":[",
+            dev->media,
+            dev->meter,
+            dev->device_id,
+            dev->unit
+        );
 
-        /* Data points */
+        /* Data points loop */
         for (uint8_t j = 0; j < dev->data_count; j++) {
-            wm_data_point_t *dp = &dev->data[j];
+            const wm_data_point_t *dp = &dev->data[j];
 
-            APPEND("{\"timestamp\":\"%s\",\"meter_datetime\":\"%s\","
-                   "\"total_m3\":%.3f,\"status\":\"%s\"}",
-                   dp->timestamp,
-                   dp->meter_datetime,
+            APPEND_FMT(
+                "{\"timestamp\":\"%s\",\"meter_datetime\":\"%s\","
+                "\"total_m3\":%.3f,\"status\":\"%s\"}",
+                dp->timestamp,
+                dp->meter_datetime,
+                dp->total_value,
+                dp->status
+            );
 
+            if (j + 1 < dev->data_count) {
+                APPEND_STR(",");
+            }
+        }
+
+        APPEND_STR("]}");
+
+        if (i + 1 < input->device_count) {
+            APPEND_STR(",");
+        }
+    }
+
+    /* Close JSON structure */
+    APPEND_STR("]}}]");
+
+    if (written_size) {
+        *written_size = output_size - remaining;
+    }
+
+    return WM_JSON_OK;
+}
