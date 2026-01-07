@@ -1,6 +1,6 @@
 # wm-bus-json-serializer
 
-An embedded JSON serialization library for smart meter gateway data.
+An embedded-friendly JSON serialization library for smart meter gateway data.
 
 This project implements a lightweight, deterministic, and transport-agnostic
 JSON serializer intended for embedded firmware environments such as STM32 and ESP32.
@@ -83,7 +83,72 @@ to the required schema.
   }
 ]
 ```
+
 ## screenshot of the output
 ![nigmh](https://github.com/user-attachments/assets/10d66e84-28e4-4383-904c-e56f44744fa0)
 
 ---
+
+## Design Decisions & Assumptions
+
+### Design Decisions
+
+- **No external JSON libraries**  
+  JSON serialization is implemented manually to maintain full control over
+  memory usage and to avoid unnecessary dependencies in embedded environments.
+
+- **Fixed-size data structures**  
+  All internal data structures use fixed-size arrays. This ensures deterministic
+  memory usage and avoids dynamic memory allocation, which is critical for
+  embedded systems.
+
+- **Caller-provided output buffer**  
+  The serialization function writes JSON into a buffer supplied by the caller.
+  This allows the application to manage memory ownership and prevents hidden
+  allocations inside the library.
+
+- **Transport-agnostic design**  
+  The library does not include any transport-specific logic (UART, MQTT, radio,
+  file I/O, etc.). This keeps the core logic reusable across different gateway
+  communication backends.
+
+- **Strict JSON schema compliance**  
+  Field names, structure, and data types strictly follow the predefined JSON
+  format. No additional or optional fields are added.
+
+### Assumptions
+
+- Input data structures are populated with valid values before serialization.
+- All string fields are null-terminated and respect their defined maximum lengths.
+- The caller provides an output buffer large enough to hold the generated JSON.
+
+---
+
+## Maximum JSON Size
+
+The maximum JSON size depends on the number of devices and the number of data
+points per device.
+
+Approximate size estimation:
+
+- Base JSON structure: ~200 bytes  
+- Per device entry: ~180 bytes  
+- Per data point: ~120 bytes  
+
+Worst-case example (4 devices × 4 data points):
+
+- Estimated maximum JSON size: **~1 KB**
+
+This estimation allows applications to dimension output buffers deterministically
+and safely in embedded environments.
+
+---
+
+## Possible Extensions
+
+- Support for multiple gateways within a single serialization call
+- Streaming or chunked JSON output for very large datasets
+- Binary or compressed serialization formats to reduce payload size
+- Integration with transport layers (MQTT, UART, radio) outside the core library
+- Unit tests for schema validation and buffer boundary conditions
+
