@@ -1,6 +1,6 @@
 # wm-bus-json-serializer
 
-An embedded-friendly JSON serialization library for smart meter gateway data.
+An embedded JSON serialization library for smart meter gateway data.
 
 This project implements a lightweight, deterministic, and transport-agnostic
 JSON serializer intended for embedded firmware environments such as STM32 and ESP32.
